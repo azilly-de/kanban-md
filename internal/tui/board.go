@@ -1270,8 +1270,12 @@ func (b *Board) columnWidth() int {
 	// Total rendered width = w * numColumns (JoinHorizontal adds no gaps).
 	w := b.width / len(b.columns)
 	const maxColWidth = 50
+	const minColWidth = 8 // card chrome (4) + minimum content (4)
 	if w > maxColWidth {
 		w = maxColWidth
+	}
+	if w < minColWidth {
+		w = minColWidth
 	}
 	return w
 }
@@ -1395,9 +1399,18 @@ func (b *Board) cardContentLines(t *task.Task, width int) []string {
 		tagStr := strings.Join(t.Tags, ",")
 		tagMaxLen := cardWidth / tagMaxFraction
 		if len(tagStr) > tagMaxLen {
-			tagStr = tagStr[:tagMaxLen-3] + "..."
+			switch {
+			case tagMaxLen > 3: //nolint:mnd // room for "..."
+				tagStr = tagStr[:tagMaxLen-3] + "..."
+			case tagMaxLen > 0:
+				tagStr = tagStr[:tagMaxLen]
+			default:
+				tagStr = ""
+			}
 		}
-		details = append(details, dimStyle.Render(tagStr))
+		if tagStr != "" {
+			details = append(details, dimStyle.Render(tagStr))
+		}
 	}
 
 	if t.Due != nil {

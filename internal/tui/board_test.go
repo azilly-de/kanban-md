@@ -93,6 +93,49 @@ func sendSpecialKey(b *tui.Board, k tea.KeyType) *tui.Board {
 	return m.(*tui.Board)
 }
 
+func TestBoard_NarrowTerminalNoPanic(t *testing.T) {
+	dir := t.TempDir()
+	kanbanDir := filepath.Join(dir, "kanban")
+	tasksDir := filepath.Join(kanbanDir, "tasks")
+	if err := os.MkdirAll(tasksDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.NewDefault("Narrow Test")
+	cfg.SetDir(kanbanDir)
+	if err := cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a task with tags to exercise tag truncation at narrow widths.
+	tk := &task.Task{
+		ID:       1,
+		Title:    "Task with tags",
+		Status:   "backlog",
+		Priority: "high",
+		Tags:     []string{"backend", "api", "urgent"},
+		Updated:  testRefTime,
+	}
+	path := filepath.Join(tasksDir, task.GenerateFilename(1, "task-with-tags"))
+	if err := task.Write(path, tk); err != nil {
+		t.Fatal(err)
+	}
+
+	b := tui.NewBoard(cfg)
+	b.SetNow(testNow)
+
+	// Test progressively narrower widths — none should panic.
+	for _, w := range []int{80, 60, 40, 20, 10, 4, 1} {
+		t.Run(fmt.Sprintf("width_%d", w), func(t *testing.T) {
+			b.Update(tea.WindowSizeMsg{Width: w, Height: 20})
+			v := b.View()
+			if v == "" {
+				t.Error("expected non-empty view")
+			}
+		})
+	}
+}
+
 func TestBoard_InitialState(t *testing.T) {
 	b, _ := setupTestBoard(t)
 	v := b.View()
